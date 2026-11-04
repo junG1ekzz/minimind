@@ -4,6 +4,7 @@ __pycache__/
 out
 website/
 docs-minimind/
-dataset/
+dataset/*.jsonl
+dataset/*.parquet
 checkpoints/
 wandb/
