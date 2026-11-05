@@ -72,7 +72,7 @@ def precompute_freqs_cis(dim: int, end: int = int(32 * 1024), rope_base: float =
             ramp = torch.clamp((torch.arange(dim // 2, device=freqs.device).float() - low) / max(high - low, 0.001), 0, 1)
             freqs = freqs * (1 - ramp + ramp / factor)
     t = torch.arange(end, device=freqs.device)
-    freqs = torch.outer(t, freqs).float()
+    freqs = torch.outer(t, freqs).float() # dim(freqs) = [32768, 48]
     freqs_cos = torch.cat([torch.cos(freqs), torch.cos(freqs)], dim=-1) * attn_factor
     freqs_sin = torch.cat([torch.sin(freqs), torch.sin(freqs)], dim=-1) * attn_factor
     return freqs_cos, freqs_sin
