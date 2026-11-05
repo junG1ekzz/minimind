@@ -8,30 +8,30 @@ RoPE 把每个头的 96 维 Q、K 两两配成 48 对，位置 m 的第 i 对旋
 
 把向量维度两两配对，每对看成二维平面上的一个点；位置 m 的 token，第 i 对旋转 m·θᵢ。
 
-```latex
+$$
 \begin{pmatrix} x'_a \\ x'_b \end{pmatrix}
 =
 \begin{pmatrix} \cos m\theta_i & -\sin m\theta_i \\ \sin m\theta_i & \cos m\theta_i \end{pmatrix}
 \begin{pmatrix} x_a \\ x_b \end{pmatrix}
-```
+$$
 
 **为什么旋转能编码位置**：位置 m 的 q 和位置 n 的 k 都旋转后再做点积，结果只取决于相对距离 n − m。注意力分数因此天然感知「两个 token 隔了多远」。
 
-```latex
+$$
 \langle R_m q,\ R_n k \rangle = \langle q,\ R_{n-m}\, k \rangle
-```
+$$
 
 **频率**：每对维度的旋转速度不同。
 
-```latex
+$$
 \theta_i = \text{base}^{-2i/d}, \qquad i = 0, 1, \dots, \tfrac{d}{2}-1
-```
+$$
 
 **波长与圈数**：转满一圈需要 λᵢ 个位置；在训练长度 L 内一共转 rᵢ 圈。
 
-```latex
+$$
 \lambda_i = \frac{2\pi}{\theta_i}, \qquad r_i = \frac{L}{\lambda_i} = \frac{L\,\theta_i}{2\pi}
-```
+$$
 
 | 维度对 | θᵢ（弧度/位置） | 波长 | L = 2048 内转了 | 负责 |
 | --- | --- | --- | --- | --- |
@@ -56,9 +56,9 @@ RoPE 把每个头的 96 维 Q、K 两两配成 48 对，位置 m 的第 i 对旋
 
 **第 4 步外积**：每个位置乘以每个频率，得到所有位置、所有频率的旋转角度。每一行是一个位置（第 0 行全为 0，不旋转），每一列是一个频率（从上往下线性增长，第 0 列每行加 1 弧度，第 47 列几乎不动）。变量名 `freqs` 在这一步之后从「频率」变成了「角度」。
 
-```latex
+$$
 \text{freqs}[m, i] = m \cdot \theta_i
-```
+$$
 
 **`.float()` 很重要**：第 0 列最后一行的角度约 32767 弧度。fp32 能较精确地表示；bf16 只有两三位有效数字，在这么大的数值附近相邻可表示的数相差上百弧度，cos、sin 会完全算错。位置编码相关计算一律用 fp32。
 
@@ -80,18 +80,18 @@ RoPE 把每个头的 96 维 Q、K 两两配成 48 对，位置 m 的第 i 对旋
 
 **旋转公式**：
 
-```latex
+$$
 q' = q \odot \cos + \text{rotate\_half}(q) \odot \sin
-```
+$$
 
 对第 i 对展开，正好是二维旋转：
 
-```latex
+$$
 \begin{aligned}
 q'_i &= q_i \cos m\theta_i - q_{i+48} \sin m\theta_i \\
 q'_{i+48} &= q_{i+48} \cos m\theta_i + q_i \sin m\theta_i
 \end{aligned}
-```
+$$
 
 ### 两种配对方式
 
@@ -128,11 +128,11 @@ freqs = freqs * (1 - ramp + ramp / factor)   # factor 默认 16
 - **低频维度**（`ramp` = 1）：i = 47 在 2048 个位置里只转了约 0.0027 弧度，模型只见过 \[0, 0.0027\] 这一小段。直接推理到 32768，角度变成约 0.044，是从没见过的 16 倍。频率除以 16 后，第 32768 个位置的角度正好等于原来第 2048 个位置的角度，落回见过的范围。
 - **代价**：压缩后相距 16 个位置的 token 在这一维上看起来只相距 1 个。低频维度本来负责粗粒度远距离信息，影响不大。
 
-```latex
+$$
 \theta_i' = \frac{\theta_i}{16}
 \quad\Rightarrow\quad
 32768 \cdot \theta_i' = 2048 \cdot \theta_i
-```
+$$
 
 **与早期位置插值（PI）的区别**：PI 把所有频率统一除以 factor，高频也被压缩，相邻 token 的距离变模糊，短距离理解变差。YaRN 按频率分段处理。
 
@@ -152,9 +152,9 @@ freqs = freqs * (1 - ramp + ramp / factor)   # factor 默认 16
 
 cos、sin 同时乘以系数 a，旋转后 q、k 长度各放大 a 倍，注意力分数放大 a² 倍，相当于调整 softmax 温度。序列变长后注意力容易过于平均，适当放大分数能保持集中。默认 1.0（不开 YaRN 时乘了等于没乘）。
 
-```latex
+$$
 \langle a\,R_m q,\ a\,R_n k \rangle = a^2 \langle R_m q,\ R_n k \rangle
-```
+$$
 
 ### 三个长度的区别
 
